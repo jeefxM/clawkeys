@@ -1,0 +1,19 @@
+# ClawKeys Robots.txt
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://clawkeys.xyz/sitemap.xml
+
+# Allow AI agents to access the guide
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: Anthropic-AI
+Allow: /
