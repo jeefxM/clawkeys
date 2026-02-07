@@ -1,65 +1,251 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect } from "react";
+
+const SAMPLE_ADDRESSES = [
+  "0x71C...4F2A",
+  "0xA3B...9E1D",
+  "0x8F2...C7B3",
+  "0xD4E...2A8F",
+  "0x5C9...F1E6",
+  "0xB7A...3D4C",
+  "0x2E8...6B9A",
+];
 
 export default function Home() {
+  const [copied, setCopied] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [remaining, setRemaining] = useState<number | null>(null);
+  const [addressIndex, setAddressIndex] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIsAnimating(true);
+      setTimeout(() => {
+        setAddressIndex((prev) => (prev + 1) % SAMPLE_ADDRESSES.length);
+        setIsAnimating(false);
+      }, 300);
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const agentCommand = `curl -s https://clawkeys.xyz/agent-guide.md`;
+
+  const copyCommand = () => {
+    navigator.clipboard.writeText(agentCommand);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const generateAndDownload = async () => {
+    setGenerating(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/generate?mnemonic=true");
+      const data = await res.json();
+
+      if (!data.success) {
+        setError(data.error || "Generation failed");
+        setGenerating(false);
+        return;
+      }
+
+      // Update remaining count
+      if (data.rateLimit) {
+        setRemaining(data.rateLimit.remaining);
+      }
+
+      // Build file content
+      const content = `# CLAWKEYS WALLET
+# Generated: ${new Date().toISOString()}
+# WARNING: Save this file securely. This is the only copy.
+
+ADDRESS=${data.wallet.address}
+PRIVATE_KEY=${data.wallet.privateKey}
+${data.wallet.mnemonic ? `MNEMONIC="${data.wallet.mnemonic}"` : ""}
+${data.wallet.hdPath ? `HD_PATH=${data.wallet.hdPath}` : ""}
+
+# SUPPORTED CHAINS
+# Your wallet works on ALL EVM chains with the same address.
+${data.chains?.map((c: { name: string; chainId: number; rpcUrl: string }) =>
+  `# ${c.name} (${c.chainId}): ${c.rpcUrl}`
+).join("\n")}
+
+# NEXT STEPS
+# 1. Save this file securely
+# 2. Get testnet tokens from faucets
+# 3. Set EVM_PRIVATE_KEY in your environment
+# 4. Start transacting
+
+# https://clawkeys.xyz
+`;
+
+      // Trigger download
+      const blob = new Blob([content], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "clawkeys.txt";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+    } catch (err) {
+      setError("Network error. Try again.");
+    }
+
+    setGenerating(false);
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="bg-[#0A0A0A] text-[#F2F2F2] min-h-screen font-mono selection:bg-[#FFD700] selection:text-black p-4">
+      <div className="dither-overlay"></div>
+
+      {/* --- COMPRESSED HEADER --- */}
+      <nav className="border border-white/20 flex justify-between items-center px-4 py-2 mb-8 bg-[#0D0D0D]">
+        <div className="text-[12px] font-bold tracking-tighter">CLAWKEYS.XYZ</div>
+        <div className="flex gap-6 text-[10px] uppercase tracking-widest text-white/60">
+          <a href="#agent-guide" className="hover:text-[#FFD700] transition-colors">Agent Guide</a>
+          <a href="/agent-guide.md" className="hover:text-[#FFD700] transition-colors">API</a>
+          <span className="text-[#FFD700] flex items-center gap-1">
+            <span className="w-1.5 h-1.5 bg-[#FFD700] animate-pulse"></span> SYSTEM: ACTIVE
+          </span>
+        </div>
+      </nav>
+
+      {/* --- AGENT GUIDE SECTION --- */}
+      <section id="agent-guide" className="border border-[#FFD700] bg-[#0D0D0D] mb-4 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-[#FFD700] text-lg">{">"}</span>
+          <h2 className="text-[12px] font-bold uppercase tracking-widest text-[#FFD700]">
+            AI Agent? Start Here
+          </h2>
+        </div>
+        <p className="text-[11px] text-white/60 mb-4 max-w-xl">
+          If you are an AI agent (LLM, autonomous script, or bot), run this command to understand what ClawKeys is and how to generate your own wallet:
+        </p>
+        <div
+          onClick={copyCommand}
+          className="bg-black border border-white/20 p-4 font-mono text-[11px] cursor-pointer hover:border-[#FFD700] transition-colors group relative"
+        >
+          <code className="text-[#FFD700]">$</code>{" "}
+          <code className="text-white/90">{agentCommand}</code>
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-white/40 group-hover:text-[#FFD700] transition-colors">
+            {copied ? "COPIED!" : "CLICK TO COPY"}
+          </span>
+        </div>
+        <p className="text-[9px] text-white/40 mt-3">
+          This returns a markdown guide with full API documentation, examples, and chain configurations.
+        </p>
+      </section>
+
+      {/* --- HERO SECTION --- */}
+      <section className="grid grid-cols-1 md:grid-cols-12 border border-white/20 bg-[#0D0D0D] mb-4">
+        <div className="md:col-span-7 p-8 border-r border-white/10 flex flex-col justify-center">
+          <h1 className="text-4xl md:text-5xl font-black leading-none mb-4 tracking-tighter uppercase">
+            Instant Wallets <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FFD700] to-white/20">for AI Agents.</span>
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-[11px] text-white/50 max-w-sm mb-6 leading-relaxed">
+            Non-custodial entropy generation at the edge. Enable your LLMs, bots, and autonomous scripts to hold assets, sign txns, and exist on-chain without human friction.
           </p>
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-4">
+              <button
+                onClick={generateAndDownload}
+                disabled={generating}
+                className="bg-[#FFD700] text-black text-[10px] font-bold px-4 py-2 hover:bg-white transition-all active:translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {generating ? "GENERATING..." : "GENERATE & DOWNLOAD"}
+              </button>
+              <a
+                href="/agent-guide.md"
+                className="border border-white/20 text-[10px] px-4 py-2 hover:bg-white/5 transition-all inline-flex items-center"
+              >
+                API_DOCS
+              </a>
+            </div>
+            {error && (
+              <p className="text-[10px] text-red-400">{error}</p>
+            )}
+            {remaining !== null && (
+              <p className="text-[9px] text-white/40">
+                {remaining} generations remaining today (5/day limit)
+              </p>
+            )}
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
+
+        {/* --- ANIMATED DITHER AI AREA --- */}
+        <div className="md:col-span-5 relative overflow-hidden h-[300px] flex items-center justify-center bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]">
+          <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_center,_#FFD700_0%,_transparent_70%)] animate-pulse"></div>
+          <div className="relative z-10 w-32 h-32 border-2 border-[#FFD700] flex flex-col items-center justify-center group">
+            <div className="absolute -top-2 -left-2 w-4 h-4 border-l-2 border-t-2 border-white"></div>
+            <div className="absolute -bottom-2 -right-2 w-4 h-4 border-r-2 border-b-2 border-white"></div>
+            <div
+              className={`text-[10px] text-[#FFD700] transition-all duration-300 ${
+                isAnimating ? "blur-sm opacity-0 scale-95" : "blur-0 opacity-100 scale-100"
+              }`}
+            >
+              {SAMPLE_ADDRESSES[addressIndex]}
+            </div>
+            <div className="w-full h-[1px] bg-white/20 mt-2 scale-x-0 group-hover:scale-x-100 transition-transform duration-500"></div>
+          </div>
+        </div>
+      </section>
+
+      {/* --- BENTO GRID --- */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Card 1: Main Feature */}
+        <div className="md:col-span-2 border border-white/20 p-4 bg-[#0D0D0D] hover:border-[#FFD700] transition-colors">
+          <div className="text-[#FFD700] text-[10px] mb-2 font-bold uppercase tracking-widest">// On-The-Fly Generation</div>
+          <div className="h-24 bg-gradient-to-br from-[#FFD700]/5 to-transparent border border-white/10 mb-2 flex items-center justify-center">
+            <code className="text-[10px] text-white/40">{`{ "wallet": "0x...", "chain": "base" }`}</code>
+          </div>
+          <p className="text-[11px] text-white/70">Trigger wallet creation via API in &lt;100ms. Designed for swarm behavior.</p>
+        </div>
+
+        {/* Card 2: Security */}
+        <div className="border border-white/20 p-4 bg-[#0D0D0D] hover:border-[#FFD700] transition-colors flex flex-col justify-between">
+          <div className="text-[10px] font-bold text-white/40 mb-8">SEC_01</div>
+          <div>
+             <h3 className="text-xs font-bold mb-1">STRICT NON-CUSTODIAL</h3>
+             <p className="text-[10px] text-white/50">Keys generated on-demand. Never stored on our servers.</p>
+          </div>
+        </div>
+
+        {/* Card 3: Chains */}
+        <div className="border border-white/20 p-4 bg-[#0D0D0D] flex flex-col justify-between hover:border-[#FFD700]">
+           <div className="grid grid-cols-4 gap-2">
+              <img src="https://assets.coingecko.com/coins/images/279/small/ethereum.png" alt="ETH" className="w-8 h-8 opacity-60 hover:opacity-100 transition-opacity" title="Ethereum" />
+              <img src="https://avatars.githubusercontent.com/u/108554348" alt="Base" className="w-8 h-8 rounded-full opacity-60 hover:opacity-100 transition-opacity" title="Base" />
+              <img src="https://assets.coingecko.com/coins/images/25244/small/Optimism.png" alt="OP" className="w-8 h-8 opacity-60 hover:opacity-100 transition-opacity" title="Optimism" />
+              <img src="https://assets.coingecko.com/coins/images/4713/small/polygon.png" alt="MATIC" className="w-8 h-8 opacity-60 hover:opacity-100 transition-opacity" title="Polygon" />
+              <img src="https://assets.coingecko.com/coins/images/12559/small/Avalanche_Circle_RedWhite_Trans.png" alt="AVAX" className="w-8 h-8 opacity-60 hover:opacity-100 transition-opacity" title="Avalanche" />
+              <img src="https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png" alt="BNB" className="w-8 h-8 opacity-60 hover:opacity-100 transition-opacity" title="BNB Chain" />
+              <img src="https://files.svgcdn.io/token-branded/monad.png" alt="Monad" className="w-8 h-8 rounded-full opacity-60 hover:opacity-100 transition-opacity" title="Monad" />
+              <span className="w-8 h-8 flex items-center justify-center text-[9px] text-white/40 border border-white/20 rounded">+100</span>
+           </div>
+           <div className="text-[10px] mt-3 uppercase font-bold tracking-tighter">All EVM Networks</div>
+        </div>
+      </div>
+
+      {/* --- FOOTER --- */}
+      <footer className="mt-8 pt-4 border-t border-white/10 text-[9px] text-white/30 flex justify-between uppercase">
+        <div className="flex items-center gap-3">
+          <span>&copy;2026 CLAWKEYS LABS</span>
+          <a href="https://github.com/jeefxM/clawkeys" target="_blank" rel="noopener noreferrer" className="hover:text-[#FFD700] transition-colors flex items-center gap-1">
+            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+            OPEN SOURCE
           </a>
         </div>
-      </main>
+        <div>VERIFY OUR CODE</div>
+      </footer>
     </div>
   );
 }
