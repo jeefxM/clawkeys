@@ -64,7 +64,8 @@ function generateWallet(withMnemonic: boolean = true): GeneratedWallet {
 }
 
 export default function Home() {
-  const [copied, setCopied] = useState(false);
+  const [copiedDocs, setCopiedDocs] = useState(false);
+  const [copiedGen, setCopiedGen] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [addressIndex, setAddressIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -81,12 +82,19 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  const agentCommand = `npx clawkeys generate --mnemonic`;
+  const docsCommand = `curl -s https://clawkeys.xyz/agent-guide.md`;
+  const generateCommand = `npx clawkeys generate --mnemonic`;
 
-  const copyCommand = () => {
-    navigator.clipboard.writeText(agentCommand);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const copyDocsCommand = () => {
+    navigator.clipboard.writeText(docsCommand);
+    setCopiedDocs(true);
+    setTimeout(() => setCopiedDocs(false), 2000);
+  };
+
+  const copyGenCommand = () => {
+    navigator.clipboard.writeText(generateCommand);
+    setCopiedGen(true);
+    setTimeout(() => setCopiedGen(false), 2000);
   };
 
   const generateAndDownload = () => {
@@ -165,21 +173,38 @@ ${wallet.hdPath ? `HD_PATH=${wallet.hdPath}` : ""}
             AI Agent? Start Here
           </h2>
         </div>
-        <p className="text-[11px] text-white/60 mb-4 max-w-xl">
-          Generate a wallet locally on your machine. Keys never touch any server or network.
-        </p>
-        <div
-          onClick={copyCommand}
-          className="bg-black border border-white/20 p-4 font-mono text-[11px] cursor-pointer hover:border-[#FFD700] transition-colors group relative"
-        >
-          <code className="text-[#FFD700]">$</code>{" "}
-          <code className="text-white/90">{agentCommand}</code>
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-white/40 group-hover:text-[#FFD700] transition-colors">
-            {copied ? "COPIED!" : "CLICK TO COPY"}
-          </span>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Read Docs */}
+          <div>
+            <p className="text-[10px] text-white/40 uppercase tracking-widest mb-2">1. Read the docs</p>
+            <div
+              onClick={copyDocsCommand}
+              className="bg-black border border-white/20 p-4 font-mono text-[11px] cursor-pointer hover:border-[#FFD700] transition-colors group relative"
+            >
+              <code className="text-[#FFD700]">$</code>{" "}
+              <code className="text-white/90">{docsCommand}</code>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-white/40 group-hover:text-[#FFD700] transition-colors">
+                {copiedDocs ? "COPIED!" : "CLICK TO COPY"}
+              </span>
+            </div>
+          </div>
+          {/* Generate Locally */}
+          <div>
+            <p className="text-[10px] text-white/40 uppercase tracking-widest mb-2">2. Generate locally</p>
+            <div
+              onClick={copyGenCommand}
+              className="bg-black border border-white/20 p-4 font-mono text-[11px] cursor-pointer hover:border-[#FFD700] transition-colors group relative"
+            >
+              <code className="text-[#FFD700]">$</code>{" "}
+              <code className="text-white/90">{generateCommand}</code>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-white/40 group-hover:text-[#FFD700] transition-colors">
+                {copiedGen ? "COPIED!" : "CLICK TO COPY"}
+              </span>
+            </div>
+          </div>
         </div>
-        <p className="text-[9px] text-white/40 mt-3">
-          Runs locally via npx. Zero network calls. See /agent-guide.md for full documentation.
+        <p className="text-[9px] text-white/40 mt-4">
+          Keys generated locally. Zero network calls. Never touch any server.
         </p>
       </section>
 
