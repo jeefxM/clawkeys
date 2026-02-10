@@ -2,10 +2,7 @@
 User-agent: *
 Allow: /
 
-# Sitemap
-Sitemap: https://clawkeys.xyz/sitemap.xml
-
-# Allow AI agents to access the guide
+# AI Agents - go to /agent-guide.md
 User-agent: GPTBot
 Allow: /
 
