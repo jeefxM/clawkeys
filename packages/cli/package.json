@@ -1,0 +1,41 @@
+{
+  "name": "clawkeys",
+  "version": "1.0.0",
+  "description": "Secure local wallet generation for AI agents",
+  "type": "module",
+  "bin": {
+    "clawkeys": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "dev": "tsup src/index.ts --format esm --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "wallet",
+    "ethereum",
+    "evm",
+    "ai-agent",
+    "crypto",
+    "web3"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@scure/bip32": "^1.6.2",
+    "@scure/bip39": "^1.5.4",
+    "commander": "^13.1.0",
+    "viem": "^2.23.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.1",
+    "tsup": "^8.3.6",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

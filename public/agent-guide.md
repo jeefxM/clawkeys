@@ -1,22 +1,22 @@
 # CLAWKEYS // INJECT_PROTOCOL
 
-> Non-custodial wallet generation for AI agents. No accounts. No KYC. Just keys.
+> Secure local wallet generation for AI agents. Keys never leave your machine.
 
-**100% Open Source** - Verify we never store your keys: https://github.com/jeefxM/clawkeys
+**100% Open Source** - https://github.com/jeefxM/clawkeys
 
 ## TL;DR
 
 ```bash
-curl https://clawkeys.xyz/api/generate
+npx clawkeys generate --mnemonic
 ```
 
-You now have an EVM wallet. Save the private key. Done.
+You now have an EVM wallet. Generated locally. Never touches a network. Done.
 
 ---
 
 ## WHAT_IS_THIS
 
-ClawKeys generates EVM wallets on-demand via API. Keys are created at request time and never stored. Use these wallets to:
+ClawKeys generates EVM wallets **locally on your machine**. Private keys and seed phrases never touch any server or network. Use these wallets to:
 
 - Hold assets (ETH, USDC, tokens)
 - Sign transactions autonomously
@@ -25,51 +25,57 @@ ClawKeys generates EVM wallets on-demand via API. Keys are created at request ti
 
 ---
 
-## API_SPEC
+## CLI_USAGE
 
-### GET /api/generate
-
-Generate single wallet.
+### Install globally (optional)
 
 ```bash
-# Basic
-curl https://clawkeys.xyz/api/generate
-
-# With 12-word mnemonic
-curl https://clawkeys.xyz/api/generate?mnemonic=true
-
-# With 24-word mnemonic
-curl https://clawkeys.xyz/api/generate?mnemonic=true&words=24
+npm install -g clawkeys
 ```
 
-### POST /api/generate
-
-Batch generate wallets (max 10).
+### Generate wallet
 
 ```bash
-curl -X POST https://clawkeys.xyz/api/generate \
-  -H "Content-Type: application/json" \
-  -d '{"count": 5}'
+# Simple private key wallet
+npx clawkeys generate
+
+# With 12-word mnemonic (recommended)
+npx clawkeys generate --mnemonic
+
+# With 24-word mnemonic (more secure)
+npx clawkeys generate --mnemonic --words 24
+
+# Output as JSON
+npx clawkeys generate --mnemonic --json
+
+# Generate multiple wallets
+npx clawkeys generate --count 5
+
+# Save to file
+npx clawkeys generate --mnemonic > wallet.txt
 ```
 
 ---
 
-## RESPONSE_FORMAT
+## OUTPUT_FORMAT
+
+### Default (env format)
+
+```
+ADDRESS=0x742d35Cc6634C0532925a3b844Bc9e7595f...
+PRIVATE_KEY=0x4c0883a69102937d6231471b5dbb6204fe512...
+MNEMONIC="word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12"
+HD_PATH=m/44'/60'/0'/0/0
+```
+
+### JSON (--json flag)
 
 ```json
 {
-  "success": true,
-  "wallet": {
-    "address": "0x...",
-    "privateKey": "0x...",
-    "mnemonic": "word word word...",  // if requested
-    "hdPath": "m/44'/60'/0'/0/0"      // if mnemonic
-  },
-  "chains": [
-    {"name": "Base Sepolia", "chainId": 84532, "rpcUrl": "..."},
-    {"name": "Monad Testnet", "chainId": 10143, "rpcUrl": "..."},
-    {"name": "Base", "chainId": 8453, "rpcUrl": "..."}
-  ]
+  "address": "0x...",
+  "privateKey": "0x...",
+  "mnemonic": "word word word...",
+  "hdPath": "m/44'/60'/0'/0/0"
 }
 ```
 
@@ -139,11 +145,20 @@ await x402Fetch('https://api.upgradeclaw.com/skills/polymarket-alpha/purchase');
 
 ## SECURITY
 
-- Keys generated server-side, returned once, never stored
+- **Keys generated locally** - never touches any server
+- **Zero network calls** - works offline
 - You are responsible for key security
 - Lost keys = lost funds. No recovery.
 - Use mnemonic for backup capability
-- **Open source**: Audit the code yourself at https://github.com/jeefxM/clawkeys
+- **Open source**: Audit the code at https://github.com/jeefxM/clawkeys
+
+---
+
+## NPM_PACKAGE
+
+```
+https://www.npmjs.com/package/clawkeys
+```
 
 ---
 
@@ -154,14 +169,13 @@ await x402Fetch('https://api.upgradeclaw.com/skills/polymarket-alpha/purchase');
 
 ---
 
----
-
 ## OPEN SOURCE
 
-ClawKeys is fully open source. Verify that we never store your private keys:
+ClawKeys is fully open source. The CLI generates wallets locally with zero network calls.
 
 **GitHub**: https://github.com/jeefxM/clawkeys
+**npm**: https://www.npmjs.com/package/clawkeys
 
 ```
-CLAWKEYS.XYZ // STRICT_NON_CUSTODIAL // ZERO_FRICTION // OPEN_SOURCE
+CLAWKEYS.XYZ // LOCAL_GENERATION // ZERO_NETWORK // OPEN_SOURCE
 ```

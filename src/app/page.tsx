@@ -1,6 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import {
+  generatePrivateKey,
+  privateKeyToAccount,
+  english,
+  generateMnemonic,
+} from "viem/accounts";
+import { HDKey } from "@scure/bip32";
+import { mnemonicToSeedSync } from "@scure/bip39";
 
 const SAMPLE_ADDRESSES = [
   "0x71C...4F2A",
@@ -12,11 +20,52 @@ const SAMPLE_ADDRESSES = [
   "0x2E8...6B9A",
 ];
 
+const DEFAULT_HD_PATH = "m/44'/60'/0'/0/0";
+
+interface GeneratedWallet {
+  address: string;
+  privateKey: string;
+  mnemonic?: string;
+  hdPath?: string;
+}
+
+function generateWallet(withMnemonic: boolean = true): GeneratedWallet {
+  if (withMnemonic) {
+    const mnemonic = generateMnemonic(english, 128); // 12 words
+    const seed = mnemonicToSeedSync(mnemonic);
+    const hdKey = HDKey.fromMasterSeed(seed);
+    const derivedKey = hdKey.derive(DEFAULT_HD_PATH);
+
+    if (!derivedKey.privateKey) {
+      throw new Error("Failed to derive private key from mnemonic");
+    }
+
+    const privateKeyBytes = derivedKey.privateKey;
+    const privateKey = `0x${Array.from(privateKeyBytes)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("")}` as `0x${string}`;
+    const account = privateKeyToAccount(privateKey);
+
+    return {
+      address: account.address,
+      privateKey,
+      mnemonic,
+      hdPath: DEFAULT_HD_PATH,
+    };
+  }
+
+  const privateKey = generatePrivateKey();
+  const account = privateKeyToAccount(privateKey);
+
+  return {
+    address: account.address,
+    privateKey,
+  };
+}
+
 export default function Home() {
   const [copied, setCopied] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [remaining, setRemaining] = useState<number | null>(null);
   const [addressIndex, setAddressIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
 
@@ -32,7 +81,7 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  const agentCommand = `curl -s https://clawkeys.xyz/agent-guide.md`;
+  const agentCommand = `npx clawkeys generate --mnemonic`;
 
   const copyCommand = () => {
     navigator.clipboard.writeText(agentCommand);
@@ -40,40 +89,31 @@ export default function Home() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const generateAndDownload = async () => {
+  const generateAndDownload = () => {
     setGenerating(true);
-    setError(null);
 
     try {
-      const res = await fetch("/api/generate?mnemonic=true");
-      const data = await res.json();
-
-      if (!data.success) {
-        setError(data.error || "Generation failed");
-        setGenerating(false);
-        return;
-      }
-
-      // Update remaining count
-      if (data.rateLimit) {
-        setRemaining(data.rateLimit.remaining);
-      }
+      // Generate wallet locally - never touches network
+      const wallet = generateWallet(true);
 
       // Build file content
       const content = `# CLAWKEYS WALLET
 # Generated: ${new Date().toISOString()}
 # WARNING: Save this file securely. This is the only copy.
+# Generated locally - key never touched any server.
 
-ADDRESS=${data.wallet.address}
-PRIVATE_KEY=${data.wallet.privateKey}
-${data.wallet.mnemonic ? `MNEMONIC="${data.wallet.mnemonic}"` : ""}
-${data.wallet.hdPath ? `HD_PATH=${data.wallet.hdPath}` : ""}
+ADDRESS=${wallet.address}
+PRIVATE_KEY=${wallet.privateKey}
+${wallet.mnemonic ? `MNEMONIC="${wallet.mnemonic}"` : ""}
+${wallet.hdPath ? `HD_PATH=${wallet.hdPath}` : ""}
 
 # SUPPORTED CHAINS
 # Your wallet works on ALL EVM chains with the same address.
-${data.chains?.map((c: { name: string; chainId: number; rpcUrl: string }) =>
-  `# ${c.name} (${c.chainId}): ${c.rpcUrl}`
-).join("\n")}
+# Base Sepolia (84532): https://sepolia.base.org
+# Monad Testnet (10143): https://testnet-rpc.monad.xyz
+# Sepolia (11155111): https://rpc.sepolia.org
+# Ethereum (1): https://eth.llamarpc.com
+# Base (8453): https://mainnet.base.org
 
 # NEXT STEPS
 # 1. Save this file securely
@@ -94,9 +134,8 @@ ${data.chains?.map((c: { name: string; chainId: number; rpcUrl: string }) =>
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-
     } catch (err) {
-      setError("Network error. Try again.");
+      console.error("Generation failed:", err);
     }
 
     setGenerating(false);
@@ -111,9 +150,9 @@ ${data.chains?.map((c: { name: string; chainId: number; rpcUrl: string }) =>
         <div className="text-[12px] font-bold tracking-tighter">CLAWKEYS.XYZ</div>
         <div className="flex gap-6 text-[10px] uppercase tracking-widest text-white/60">
           <a href="#agent-guide" className="hover:text-[#FFD700] transition-colors">Agent Guide</a>
-          <a href="/agent-guide.md" className="hover:text-[#FFD700] transition-colors">API</a>
+          <a href="/agent-guide.md" className="hover:text-[#FFD700] transition-colors">Docs</a>
           <span className="text-[#FFD700] flex items-center gap-1">
-            <span className="w-1.5 h-1.5 bg-[#FFD700] animate-pulse"></span> SYSTEM: ACTIVE
+            <span className="w-1.5 h-1.5 bg-[#FFD700] animate-pulse"></span> LOCAL_GEN
           </span>
         </div>
       </nav>
@@ -127,7 +166,7 @@ ${data.chains?.map((c: { name: string; chainId: number; rpcUrl: string }) =>
           </h2>
         </div>
         <p className="text-[11px] text-white/60 mb-4 max-w-xl">
-          If you are an AI agent (LLM, autonomous script, or bot), run this command to understand what ClawKeys is and how to generate your own wallet:
+          Generate a wallet locally on your machine. Keys never touch any server or network.
         </p>
         <div
           onClick={copyCommand}
@@ -140,7 +179,7 @@ ${data.chains?.map((c: { name: string; chainId: number; rpcUrl: string }) =>
           </span>
         </div>
         <p className="text-[9px] text-white/40 mt-3">
-          This returns a markdown guide with full API documentation, examples, and chain configurations.
+          Runs locally via npx. Zero network calls. See /agent-guide.md for full documentation.
         </p>
       </section>
 
@@ -152,7 +191,7 @@ ${data.chains?.map((c: { name: string; chainId: number; rpcUrl: string }) =>
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FFD700] to-white/20">for AI Agents.</span>
           </h1>
           <p className="text-[11px] text-white/50 max-w-sm mb-6 leading-relaxed">
-            Non-custodial entropy generation at the edge. Enable your LLMs, bots, and autonomous scripts to hold assets, sign txns, and exist on-chain without human friction.
+            Local entropy generation. Enable your LLMs, bots, and autonomous scripts to hold assets, sign txns, and exist on-chain. Keys never leave your machine.
           </p>
           <div className="flex flex-col gap-3">
             <div className="flex gap-4">
@@ -167,17 +206,12 @@ ${data.chains?.map((c: { name: string; chainId: number; rpcUrl: string }) =>
                 href="/agent-guide.md"
                 className="border border-white/20 text-[10px] px-4 py-2 hover:bg-white/5 transition-all inline-flex items-center"
               >
-                API_DOCS
+                DOCS
               </a>
             </div>
-            {error && (
-              <p className="text-[10px] text-red-400">{error}</p>
-            )}
-            {remaining !== null && (
-              <p className="text-[9px] text-white/40">
-                {remaining} generations remaining today (5/day limit)
-              </p>
-            )}
+            <p className="text-[9px] text-white/40">
+              Generated in your browser. No server. No network calls.
+            </p>
           </div>
         </div>
 
@@ -203,19 +237,19 @@ ${data.chains?.map((c: { name: string; chainId: number; rpcUrl: string }) =>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* Card 1: Main Feature */}
         <div className="md:col-span-2 border border-white/20 p-4 bg-[#0D0D0D] hover:border-[#FFD700] transition-colors">
-          <div className="text-[#FFD700] text-[10px] mb-2 font-bold uppercase tracking-widest">// On-The-Fly Generation</div>
+          <div className="text-[#FFD700] text-[10px] mb-2 font-bold uppercase tracking-widest">// Local Generation</div>
           <div className="h-24 bg-gradient-to-br from-[#FFD700]/5 to-transparent border border-white/10 mb-2 flex items-center justify-center">
-            <code className="text-[10px] text-white/40">{`{ "wallet": "0x...", "chain": "base" }`}</code>
+            <code className="text-[10px] text-white/40">{`npx clawkeys generate --mnemonic`}</code>
           </div>
-          <p className="text-[11px] text-white/70">Trigger wallet creation via API in &lt;100ms. Designed for swarm behavior.</p>
+          <p className="text-[11px] text-white/70">Generate wallets locally in &lt;100ms. Zero network calls. Keys never leave your machine.</p>
         </div>
 
         {/* Card 2: Security */}
         <div className="border border-white/20 p-4 bg-[#0D0D0D] hover:border-[#FFD700] transition-colors flex flex-col justify-between">
           <div className="text-[10px] font-bold text-white/40 mb-8">SEC_01</div>
           <div>
-             <h3 className="text-xs font-bold mb-1">STRICT NON-CUSTODIAL</h3>
-             <p className="text-[10px] text-white/50">Keys generated on-demand. Never stored on our servers.</p>
+             <h3 className="text-xs font-bold mb-1">TRUE LOCAL GEN</h3>
+             <p className="text-[10px] text-white/50">Keys generated on your machine. Never touch any server.</p>
           </div>
         </div>
 
@@ -243,8 +277,11 @@ ${data.chains?.map((c: { name: string; chainId: number; rpcUrl: string }) =>
             <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
             OPEN SOURCE
           </a>
+          <a href="https://www.npmjs.com/package/clawkeys" target="_blank" rel="noopener noreferrer" className="hover:text-[#FFD700] transition-colors">
+            NPM
+          </a>
         </div>
-        <div>VERIFY OUR CODE</div>
+        <div>LOCAL GENERATION</div>
       </footer>
     </div>
   );
